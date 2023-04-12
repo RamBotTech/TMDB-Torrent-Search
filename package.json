@@ -1,0 +1,16 @@
+{
+  "name": "tmdb-search",
+  "version": "1.0.0",
+  "description": "A simple TMDB movie and TV show search website",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "ejs": "^3.1.6",
+    "express": "^4.17.1",
+    "fs": "^0.0.1-security",
+    "node-fetch": "^2.6.1"
+  }
+}

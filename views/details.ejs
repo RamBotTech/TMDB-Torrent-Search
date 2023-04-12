@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= movie.title %></title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <p><%= movie.overview %></p>
+    <p>Release Date: <%= movie.release_date %></p>
+    <p>Rating: <%= movie.vote_average %></p>
+    <img src="https://image.tmdb.org/t/p/w500<%= movie.poster_path %>" alt="<%= movie.title %> poster">
+  </body>
+</html>

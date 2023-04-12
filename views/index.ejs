@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>TMDB Search</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script>
+        let globalWaitTime = 0;
+     async function fetchDetailsAndSeasons(id, mediaType) {
+  let details;
+  if (mediaType === "movie") {
+    const url = `/details/${id}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    details = data.movie;
+  } else if (mediaType === "tv") {
+    const url = `/tv/${id}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    details = data.details;
+  }
+
+  return {
+    details,
+    seasons: mediaType === "tv" ? details.seasons : null,
+  };
+}
+
+async function fetchMagnetLinks(query) {
+    console.log("Data being passed:", query);
+
+    const response = await fetch('/magnet_links', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+    });
+    const data = await response.json();
+    console.log("fetchMagnetLinks response data:", data);
+    return data.magnet_links;
+}
+
+
+
+
+function createMagnetLinksTable(torrentResults) {
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const tbody = document.createElement('tbody');
+  const headerRow = document.createElement('tr'); // Add this line
+
+  if (!torrentResults) {
+    console.error('torrentResults is undefined or null');
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    return table;
+  }
+
+  const headers = ['Title', 'Magnet Link', 'Seeders', 'Leechers', 'Size', 'Pubdate'];
+  headers.forEach((headerText) => {
+    headers.push('Download');
+    const th = document.createElement('th');
+    th.textContent = headerText;
+    headerRow.appendChild(th);
+  });
+
+
+    torrentResults.forEach((result) => {
+    const row = document.createElement('tr');
+
+    const titleCell = document.createElement('td');
+    titleCell.textContent = result.title;
+    row.appendChild(titleCell);
+
+    const magnetLinkCell = document.createElement('td');
+    const magnetLinkAnchor = document.createElement('a');
+    magnetLinkAnchor.textContent = 'Magnet Link';
+    magnetLinkAnchor.href = result.download;
+    magnetLinkCell.appendChild(magnetLinkAnchor);
+    row.appendChild(magnetLinkCell);
+
+    const seedersCell = document.createElement('td');
+    seedersCell.textContent = result.seeders;
+    row.appendChild(seedersCell);
+
+    const leechersCell = document.createElement('td');
+    leechersCell.textContent = result.leechers;
+    row.appendChild(leechersCell);
+
+    const sizeCell = document.createElement('td');
+    sizeCell.textContent = result.size;
+    row.appendChild(sizeCell);
+
+    const pubdateCell = document.createElement('td');
+    pubdateCell.textContent = result.pubdate;
+    row.appendChild(pubdateCell);
+
+    const downloadCell = document.createElement('td');
+    const downloadButton = createDownloadButton(result.download);
+    downloadCell.appendChild(downloadButton);
+    row.appendChild(downloadCell);
+
+    tbody.appendChild(row);
+  });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  return table;
+}
+
+function createCloseButton(li, contentWrapper) {
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "X";
+  closeButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    li.classList.remove("expanded");
+    const a = li.querySelector("a");
+    const span = li.querySelector("span");
+    li.innerHTML = "";
+    li.appendChild(a);
+    li.appendChild(span);
+  });
+  contentWrapper.appendChild(closeButton);
+  return closeButton;
+}
+
+
+function createDownloadOptionsBtn(query) {
+  const button = document.createElement("button");
+  button.textContent = "Get Download Options";
+
+  button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+
+    if (globalWaitTime > 0) {
+      event.target.disabled = true;
+      const countdownInterval = setInterval(() => {
+        updateButtonCountdown(event.target, globalWaitTime);
+      }, 100);
+
+      await new Promise((resolve) => setTimeout(resolve, globalWaitTime));
+      clearInterval(countdownInterval);
+
+      event.target.disabled = false;
+      event.target.textContent = "Get Download Options";
+    }
+
+    globalWaitTime = 20000;
+
+    const magnetLinks = await fetchMagnetLinks(query);
+    const magnetLinksTable = createMagnetLinksTable(magnetLinks);
+    button.parentNode.insertBefore(magnetLinksTable, button.nextSibling);
+    button.parentNode.removeChild(button);
+  });
+
+  button.addEventListener("mousedown", (event) => {
+    event.stopPropagation();
+  });
+
+  return button;
+}
+
+function createDownloadButton(magnetLink) {
+  const downloadButton = document.createElement('button');
+  downloadButton.textContent = 'Download';
+  downloadButton.addEventListener('click', async () => {
+    downloadButton.disabled = true;
+    downloadButton.textContent = 'Downloading...';
+    const result = await downloadToBitport(magnetLink);
+    console.log('Download result:', result);
+    if (result.status === 'error') {
+      downloadButton.textContent = 'Error';
+    } else {
+      downloadButton.textContent = 'Downloaded';
+    }
+  });
+  return downloadButton;
+}
+
+
+
+
+async function downloadToBitport(magnetLink) {
+  const response = await fetch('/download_to_bitport', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ magnetLink }),
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+
+function updateButtonCountdown(button, remainingTime) {
+  button.textContent = `Please wait ${(remainingTime / 1000).toFixed(1)} seconds...`;
+}
+
+
+
+
+      function search(query) {
+        if (!query) {
+          return;
+        }
+
+        const url = `/search?query=${encodeURIComponent(query)}`;
+
+        fetch(url)
+          .then(response => response.json())
+          .then(results => {
+            const resultsList = document.getElementById('results');
+            resultsList.innerHTML = '';
+
+            if (results.length > 0) {
+              results.forEach(result => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.textContent = result.title || result.name;
+                const span = document.createElement('span');
+                span.textContent = `(${result.media_type === 'movie' ? 'Movie' : 'TV show'})`;
+                li.appendChild(a);
+                li.appendChild(span);
+
+                li.addEventListener("click", async (event) => {
+  event.preventDefault();
+  if (li.classList.contains("expanded")) {
+    return;
+  } else {
+    li.classList.add("expanded");
+    const details = await fetchDetailsAndSeasons(
+      result.id,
+      result.media_type
+    );
+    if (details) {
+      const contentWrapper = document.createElement("div");
+      const closeButton = createCloseButton(li, contentWrapper);
+
+      const description = document.createElement("p");
+      description.textContent = details.details.overview;
+      contentWrapper.appendChild(description);
+
+      if (details.seasons && result.media_type === "tv") {
+        const seasonList = document.createElement("ul");
+        details.seasons.forEach((season) => {
+          const seasonItem = document.createElement("li");
+          seasonItem.textContent = season.name;
+
+          // Add the download options button for each season
+          const downloadOptionsBtn = createDownloadOptionsBtn(
+            `${result.title || result.name} S${season.season_number.toString().padStart(2, '0')}`
+          );
+          seasonItem.appendChild(downloadOptionsBtn);
+
+          seasonList.appendChild(seasonItem);
+        });
+        contentWrapper.appendChild(seasonList);
+      } else if (result.media_type === "movie") {
+        // Add the download options button for movies only
+        const downloadOptionsBtn = createDownloadOptionsBtn(`${result.title || result.name}`);
+        contentWrapper.appendChild(downloadOptionsBtn);
+      }
+      li.appendChild(contentWrapper);
+    }
+  }
+});
+
+
+                resultsList.appendChild(li);
+              });
+            }
+          });
+      }
+
+      window.onload = function () {
+        const searchInput = document.getElementById('query');
+        searchInput.addEventListener('input', function (event) {
+          search(event.target.value);
+        });
+      };
+
+      setInterval(() => {
+  if (globalWaitTime > 0) {
+    globalWaitTime -= 100;
+  }
+}, 100);
+    </script>
+  </head>
+  <body>
+    <a id="authorizeBitport" href="/authorize_bitport">Authorize with Bitport</a>
+    <h1>TMDB Search</h1>
+    <form>
+      <label for="query">Search for a movie or TV show:</label>
+      <input type="text" id="query">
+    </form>
+    <ul id="results"></ul>
+  </body>
+</html>
